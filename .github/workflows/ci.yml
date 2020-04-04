@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: docker://archlinux
+    - name: Upgrade arch
+      run: pacman -Syu --noconfirm
+    - name: Install base-devel
+      run: pacman -S --noconfirm base-devel
+    - name: Build package
+      run: makepkg
