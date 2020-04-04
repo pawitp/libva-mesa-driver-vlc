@@ -19,5 +19,7 @@ jobs:
       run: pacman -S --noconfirm base-devel
     - name: Create build user
       run: useradd -m build
+    - name: Give permission for build directory
+      run: chown build .
     - name: Build package
       run: su build -c makepkg
