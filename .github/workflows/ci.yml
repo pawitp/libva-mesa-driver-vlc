@@ -16,12 +16,12 @@ jobs:
     - name: Install dependencies
       run: source $GITHUB_WORKSPACE/PKGBUILD && pacman -Syu --noconfirm --needed "${makedepends[@]}" "${depends[@]}" base-devel
       shell: bash
-    - name: Import PGP keys
-      run: source $GITHUB_WORKSPACE/PKGBUILD && gpg --recv-keys "${validpgpkeys[@]}"
-      shell: bash
     - name: Create build user
       run: useradd -m build
     - name: Give permission for build directory
       run: chown build $GITHUB_WORKSPACE
+    - name: Import PGP keys
+      run: su build -c 'source $GITHUB_WORKSPACE/PKGBUILD && gpg --recv-keys "${validpgpkeys[@]}"'
+      shell: bash
     - name: Build package
       run: su build -c "cd $GITHUB_WORKSPACE && makepkg"
