@@ -18,4 +18,4 @@ jobs:
     - name: Install base-devel
       run: pacman -S --noconfirm base-devel
     - name: Build package
-      run: makepkg
+      run: su 1001 -c makepkg
