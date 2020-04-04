@@ -9,10 +9,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: archlinux
 
     steps:
     - uses: actions/checkout@v2
-    - uses: docker://archlinux
     - name: Upgrade arch
       run: pacman -Syu --noconfirm
     - name: Install base-devel
