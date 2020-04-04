@@ -14,10 +14,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
-      run: source PKGBUILD && pacman -Syu --noconfirm --needed "${makedepends[@]}" "${depends[@]}" base-devel
+      run: source $GITHUB_WORKSPACE/PKGBUILD && pacman -Syu --noconfirm --needed "${makedepends[@]}" "${depends[@]}" base-devel
     - name: Create build user
       run: useradd -m build
     - name: Give permission for build directory
-      run: chown build .
+      run: chown build $GITHUB_WORKSPACE
     - name: Build package
-      run: su build -c makepkg
+      run: su build -c "cd $GITHUB_WORKSPACE && makepkg"
