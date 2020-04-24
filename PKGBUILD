@@ -4,8 +4,8 @@
 pkgbase=mesa
 pkgname=('libva-mesa-driver')
 pkgdesc="An open-source implementation of the OpenGL specification"
-pkgver=20.0.4
-pkgrel=9999
+pkgver=20.0.5
+pkgrel=99
 arch=('x86_64')
 makedepends=('python-mako' 'libxml2' 'libx11' 'xorgproto' 'libdrm' 'libxshmfence' 'libxxf86vm'
              'libxdamage' 'libvdpau' 'libva' 'wayland' 'wayland-protocols' 'zstd'
@@ -14,12 +14,10 @@ makedepends=('python-mako' 'libxml2' 'libx11' 'xorgproto' 'libdrm' 'libxshmfence
 url="https://www.mesa3d.org/"
 license=('custom')
 source=(https://mesa.freedesktop.org/archive/mesa-${pkgver}.tar.xz{,.sig}
-        mesa-llvm-10.patch::https://github.com/mesa3d/mesa/commit/ff1a3a00cb37d84ab9a563f0aa241714876f56b4.patch
         convert-interlaced-nv12-to-progressive.patch
         LICENSE)
 sha512sums=('17d8bc3b56779a8e5648d81da9ee97b66bcec015710801edce4e8055fbb314cd9ebc1d112e3035480ba844c7d9ae6b5b1f1eac0cc0817e69e9253a7748451a55'
             'SKIP'
-	    'e6c1812816ed6251959400a9f6824b604b69d4ce057b677baff8c4c2c41de8edc1571ce13f0cc9ec87eb0e9d007a305b6a1727d820a8632f482c7a8629bd6fb8'
             '0b72088f8c41259ddcb83468345ee72e1a928833c284415afec82a96daf112697732d4cc659f22e39780fb329459adedfb9ff6b76839675e20136147a1c622ad'
             'f9f0d0ccf166fe6cb684478b6f1e1ab1f2850431c06aa041738563eb1808a004e52cdec823c103c9e180f03ffc083e95974d291353f0220fe52ae6d4897fecc7')
 validpgpkeys=('8703B6700E7EE06D7A39B8D6EDAE37B02CEB490D'  # Emil Velikov <emil.l.velikov@gmail.com>
@@ -32,7 +30,6 @@ validpgpkeys=('8703B6700E7EE06D7A39B8D6EDAE37B02CEB490D'  # Emil Velikov <emil.l
 prepare() {
   cd mesa-$pkgver
   patch --forward --strip=1 --input="${srcdir}/convert-interlaced-nv12-to-progressive.patch"
-  patch -p1 -i ../mesa-llvm-10.patch
 }
 
 build() {
