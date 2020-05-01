@@ -4,7 +4,7 @@
 pkgbase=mesa
 pkgname=('libva-mesa-driver')
 pkgdesc="An open-source implementation of the OpenGL specification"
-pkgver=20.0.5
+pkgver=20.0.6
 pkgrel=99
 arch=('x86_64')
 makedepends=('python-mako' 'libxml2' 'libx11' 'xorgproto' 'libdrm' 'libxshmfence' 'libxxf86vm'
@@ -16,7 +16,7 @@ license=('custom')
 source=(https://mesa.freedesktop.org/archive/mesa-${pkgver}.tar.xz{,.sig}
         convert-interlaced-nv12-to-progressive.patch
         LICENSE)
-sha512sums=('6f5780f7574400fea54978b40eb97faca35826a8a7bed96362d7bebcda78e2cadd44585ef8dd7dc126e0cc62cff61bee9b2ea360fedcc09a1fbb4c1f20c6aa08'
+sha512sums=('a93dc3ed57ed7469b7c60cdbdcf4f29c5da4ec3986171c7b534e009e136ca21fec16207ffab38a6747437a9b1060e2e6c4b74c4e5cdc168b9aba0fc1940b5e90'
             'SKIP'
             '0b72088f8c41259ddcb83468345ee72e1a928833c284415afec82a96daf112697732d4cc659f22e39780fb329459adedfb9ff6b76839675e20136147a1c622ad'
             'f9f0d0ccf166fe6cb684478b6f1e1ab1f2850431c06aa041738563eb1808a004e52cdec823c103c9e180f03ffc083e95974d291353f0220fe52ae6d4897fecc7')
@@ -34,7 +34,7 @@ prepare() {
 
 build() {
   arch-meson mesa-$pkgver build \
-    -D b_lto=false \
+    -D b_lto=true \
     -D b_ndebug=true \
     -D platforms=x11,wayland,drm,surfaceless \
     -D dri-drivers=i915,i965,r100,r200,nouveau \
