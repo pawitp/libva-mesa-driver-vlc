@@ -25,6 +25,6 @@ jobs:
       shell: bash
     - name: Build package
       run: su build -c "cd $GITHUB_WORKSPACE && makepkg"
-    - uses: actions/upload-artifact@v2-preview
+    - uses: actions/upload-artifact@v2
       with:	
         path: ${{ github.workspace }}/libva-mesa-driver-*
