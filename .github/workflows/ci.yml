@@ -21,7 +21,7 @@ jobs:
     - name: Give permission for build directory
       run: chown build $GITHUB_WORKSPACE
     - name: Import PGP keys
-      run: su build -c 'source $GITHUB_WORKSPACE/PKGBUILD && gpg --recv-keys "${validpgpkeys[@]}"'
+      run: su build -c 'source $GITHUB_WORKSPACE/PKGBUILD && gpg --keyserver keyserver.ubuntu.com --recv-keys "${validpgpkeys[@]}"'
       shell: bash
     - name: Build package
       run: su build -c "cd $GITHUB_WORKSPACE && makepkg"
