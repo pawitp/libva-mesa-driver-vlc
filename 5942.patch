@@ -1,0 +1,259 @@
+From 8c7ca97d3e3e9f83d7d968fcd916e6c1242cfd75 Mon Sep 17 00:00:00 2001
+From: Thong Thai <thong.thai@amd.com>
+Date: Sat, 15 Aug 2020 14:09:01 -0400
+Subject: [PATCH 1/3] frontends/va: Add support for NV12/P010/P016 to
+ vaDeriveImage
+
+Signed-off-by: Thong Thai <thong.thai@amd.com>
+Reviewed-by: Leo Liu <leo.liu@amd.com>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5942>
+---
+ src/gallium/frontends/va/image.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/src/gallium/frontends/va/image.c b/src/gallium/frontends/va/image.c
+index 3a6a7e83d14..bda08ae4314 100644
+--- a/src/gallium/frontends/va/image.c
++++ b/src/gallium/frontends/va/image.c
+@@ -262,11 +262,15 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+          offset = 0;
+    }
+ 
++   img->num_planes = 1;
++   img->offsets[0] = offset;
++
+    switch (img->format.fourcc) {
+    case VA_FOURCC('U','Y','V','Y'):
+    case VA_FOURCC('Y','U','Y','V'):
+       img->pitches[0] = stride > 0 ? stride : w * 2;
+       assert(img->pitches[0] >= (w * 2));
++      img->data_size  = img->pitches[0] * h;
+       break;
+ 
+    case VA_FOURCC('B','G','R','A'):
+@@ -275,6 +279,17 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    case VA_FOURCC('R','G','B','X'):
+       img->pitches[0] = stride > 0 ? stride : w * 4;
+       assert(img->pitches[0] >= (w * 4));
++      img->data_size  = img->pitches[0] * h;
++      break;
++
++   case VA_FOURCC('N','V','1','2'):
++   case VA_FOURCC('P','0','1','0'):
++   case VA_FOURCC('P','0','1','6'):
++      img->num_planes = 2;
++      img->pitches[0] = stride > 0 ? stride : w;
++      img->pitches[1] = stride > 0 ? stride : w;
++      img->offsets[1] = (stride > 0 ? stride : w) * h;
++      img->data_size  = (stride > 0 ? stride : w) * h * 3 / 2;
+       break;
+ 
+    default:
+@@ -285,10 +300,6 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+       return VA_STATUS_ERROR_OPERATION_FAILED;
+    }
+ 
+-   img->num_planes = 1;
+-   img->offsets[0] = offset;
+-   img->data_size  = img->pitches[0] * h;
+-
+    img_buf = CALLOC(1, sizeof(vlVaBuffer));
+    if (!img_buf) {
+       FREE(img);
+-- 
+GitLab
+
+
+From fcb558321e65b62244a11e0066bb8713b1854721 Mon Sep 17 00:00:00 2001
+From: Thong Thai <thong.thai@amd.com>
+Date: Thu, 16 Jul 2020 16:57:54 -0400
+Subject: [PATCH 2/3] frontends/va: Derive image from interlaced buffers
+
+Allow vaDriveImage to derive a vaImage from interlaced buffers
+by creating a new progressive buffer.
+
+v2: Keeps the surface used by DeriveImage untouched (Pierre-Eric)
+v3: Fixed a segfault reported by Roman Elshin
+
+Closes: https://gitlab.freedesktop.org/mesa/mesa/-/issues/1428
+Signed-off-by: Thong Thai <thong.thai@amd.com>
+Reviewed-by: Leo Liu <leo.liu@amd.com>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5942>
+---
+ src/gallium/frontends/va/buffer.c     |  6 ++++-
+ src/gallium/frontends/va/image.c      | 37 ++++++++++++++++++++++++---
+ src/gallium/frontends/va/va_private.h |  1 +
+ 3 files changed, 40 insertions(+), 4 deletions(-)
+
+diff --git a/src/gallium/frontends/va/buffer.c b/src/gallium/frontends/va/buffer.c
+index 5ab90186a1a..d1c00f4b8e8 100644
+--- a/src/gallium/frontends/va/buffer.c
++++ b/src/gallium/frontends/va/buffer.c
+@@ -204,9 +204,13 @@ vlVaDestroyBuffer(VADriverContextP ctx, VABufferID buf_id)
+       return VA_STATUS_ERROR_INVALID_BUFFER;
+    }
+ 
+-   if (buf->derived_surface.resource)
++   if (buf->derived_surface.resource) {
+       pipe_resource_reference(&buf->derived_surface.resource, NULL);
+ 
++      if (buf->derived_image_buffer)
++         buf->derived_image_buffer->destroy(buf->derived_image_buffer);
++   }
++
+    FREE(buf->data);
+    FREE(buf);
+    handle_table_remove(VL_VA_DRIVER(ctx)->htab, buf_id);
+diff --git a/src/gallium/frontends/va/image.c b/src/gallium/frontends/va/image.c
+index bda08ae4314..3d6e0919132 100644
+--- a/src/gallium/frontends/va/image.c
++++ b/src/gallium/frontends/va/image.c
+@@ -201,6 +201,7 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    VAImage *img;
+    struct pipe_screen *screen;
+    struct pipe_surface **surfaces;
++   struct pipe_video_buffer *new_buffer = NULL;
+    int w;
+    int h;
+    int i;
+@@ -225,9 +226,6 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    if (!surf || !surf->buffer)
+       return VA_STATUS_ERROR_INVALID_SURFACE;
+ 
+-   if (surf->buffer->interlaced)
+-     return VA_STATUS_ERROR_OPERATION_FAILED;
+-
+    surfaces = surf->buffer->get_surfaces(surf->buffer);
+    if (!surfaces || !surfaces[0]->texture)
+       return VA_STATUS_ERROR_ALLOCATION_FAILED;
+@@ -285,6 +283,38 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    case VA_FOURCC('N','V','1','2'):
+    case VA_FOURCC('P','0','1','0'):
+    case VA_FOURCC('P','0','1','6'):
++      if (surf->buffer->interlaced) {
++         struct u_rect src_rect, dst_rect;
++         struct pipe_video_buffer new_template;
++
++         new_template = surf->templat;
++         new_template.interlaced = false;
++         new_buffer = drv->pipe->create_video_buffer(drv->pipe, &new_template);
++
++         /* convert the interlaced to the progressive */
++         src_rect.x0 = dst_rect.x0 = 0;
++         src_rect.x1 = dst_rect.x1 = surf->templat.width;
++         src_rect.y0 = dst_rect.y0 = 0;
++         src_rect.y1 = dst_rect.y1 = surf->templat.height;
++
++         vl_compositor_yuv_deint_full(&drv->cstate, &drv->compositor,
++                           surf->buffer, new_buffer,
++                           &src_rect, &dst_rect,
++                           VL_COMPOSITOR_WEAVE);
++
++         /* recalculate the values now that we have a new surface */
++         surfaces = surf->buffer->get_surfaces(new_buffer);
++         if (screen->resource_get_info) {
++            screen->resource_get_info(screen, surfaces[0]->texture, &stride,
++                                    &offset);
++            if (!stride)
++               offset = 0;
++         }
++
++         w = align(new_buffer->width, 2);
++         h = align(new_buffer->height, 2);
++      }
++
+       img->num_planes = 2;
+       img->pitches[0] = stride > 0 ? stride : w;
+       img->pitches[1] = stride > 0 ? stride : w;
+@@ -314,6 +344,7 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    img_buf->num_elements = 1;
+ 
+    pipe_resource_reference(&img_buf->derived_surface.resource, surfaces[0]->texture);
++   img_buf->derived_image_buffer = new_buffer;
+ 
+    img->buf = handle_table_add(VL_VA_DRIVER(ctx)->htab, img_buf);
+    mtx_unlock(&drv->mutex);
+diff --git a/src/gallium/frontends/va/va_private.h b/src/gallium/frontends/va/va_private.h
+index e3a9790103b..b80eea5b263 100644
+--- a/src/gallium/frontends/va/va_private.h
++++ b/src/gallium/frontends/va/va_private.h
+@@ -267,6 +267,7 @@ typedef struct {
+    unsigned int export_refcount;
+    VABufferInfo export_state;
+    unsigned int coded_size;
++   struct pipe_video_buffer *derived_image_buffer;
+ } vlVaBuffer;
+ 
+ typedef struct {
+-- 
+GitLab
+
+
+From 338745c6f4b7133d7b36f78562d46bc4e8d368f5 Mon Sep 17 00:00:00 2001
+From: Thong Thai <thong.thai@amd.com>
+Date: Sat, 15 Aug 2020 14:36:45 -0400
+Subject: [PATCH 3/3] frontends/va: Derive image from interlaced buffers in
+ some cases
+
+Add an allowlist to make an exception when deriving images from
+interlaced buffers. Normally, the function should fail if the surface
+needs to be modified to derive the image. But some applications do not
+follow the fall-back method of using vaCreateImage + vaPutImage as
+mentioned in the VAAPI documentation, so we have to make an exception.
+
+Signed-off-by: Thong Thai <thong.thai@amd.com>
+Reviewed-by: Leo Liu <leo.liu@amd.com>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5942>
+---
+ src/gallium/frontends/va/image.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/src/gallium/frontends/va/image.c b/src/gallium/frontends/va/image.c
+index 3d6e0919132..8c0f03eabfb 100644
+--- a/src/gallium/frontends/va/image.c
++++ b/src/gallium/frontends/va/image.c
+@@ -32,6 +32,7 @@
+ #include "util/u_handle_table.h"
+ #include "util/u_surface.h"
+ #include "util/u_video.h"
++#include "util/u_process.h"
+ 
+ #include "vl/vl_winsys.h"
+ #include "vl/vl_video_buffer.h"
+@@ -208,6 +209,17 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    unsigned stride = 0;
+    unsigned offset = 0;
+ 
++   /* This function is used by some programs to test for hardware decoding, but on
++    * AMD devices, the buffers default to interlaced, which causes this function to fail.
++    * Some programs expect this function to fail, while others, assume this means
++    * hardware acceleration is not available and give up without trying the fall-back 
++    * vaCreateImage + vaPutImage 
++    */
++   const char *proc = util_get_process_name();
++   const char *derive_interlaced_allowlist[] = {
++         "vlc",
++   };
++
+    if (!ctx)
+       return VA_STATUS_ERROR_INVALID_CONTEXT;
+ 
+@@ -226,6 +238,15 @@ vlVaDeriveImage(VADriverContextP ctx, VASurfaceID surface, VAImage *image)
+    if (!surf || !surf->buffer)
+       return VA_STATUS_ERROR_INVALID_SURFACE;
+ 
++   if (surf->buffer->interlaced) {
++      for (i = 0; i < ARRAY_SIZE(derive_interlaced_allowlist); i++)
++         if ((strcmp(derive_interlaced_allowlist[i], proc) == 0))
++            break;
++
++      if (i >= ARRAY_SIZE(derive_interlaced_allowlist))
++         return VA_STATUS_ERROR_OPERATION_FAILED;
++   }
++
+    surfaces = surf->buffer->get_surfaces(surf->buffer);
+    if (!surfaces || !surfaces[0]->texture)
+       return VA_STATUS_ERROR_ALLOCATION_FAILED;
+-- 
+GitLab
+

@@ -16,11 +16,11 @@ makedepends=('python-mako' 'libxml2' 'libx11' 'xorgproto' 'libdrm' 'libxshmfence
 url="https://www.mesa3d.org/"
 license=('custom')
 source=(https://mesa.freedesktop.org/archive/mesa-${pkgver}.tar.xz{,.sig}
-        convert-interlaced-nv12-to-progressive.patch
+        5942.patch
         LICENSE)
 sha512sums=('5d609359754db3e3679bffd5306c1f1d1cf46a2ea98428a9451fe0d99bbf73da863c5d94e6561712cd2012ad13615666cf3d712e54f379b34c091fead39d4795'
             'SKIP'
-            '0b72088f8c41259ddcb83468345ee72e1a928833c284415afec82a96daf112697732d4cc659f22e39780fb329459adedfb9ff6b76839675e20136147a1c622ad'
+            'd810c1156101e1e2aa0a1a70af2c09846bb405844488fa89764150b78d9cd1da6af639b0b3b2353ec394d0d77b23bca227c7ee155ca14829b6b291e034530324'
             'f9f0d0ccf166fe6cb684478b6f1e1ab1f2850431c06aa041738563eb1808a004e52cdec823c103c9e180f03ffc083e95974d291353f0220fe52ae6d4897fecc7')
 validpgpkeys=('8703B6700E7EE06D7A39B8D6EDAE37B02CEB490D'  # Emil Velikov <emil.l.velikov@gmail.com>
               '946D09B5E4C9845E63075FF1D961C596A7203456'  # Andres Gomez <tanty@igalia.com>
@@ -31,7 +31,7 @@ validpgpkeys=('8703B6700E7EE06D7A39B8D6EDAE37B02CEB490D'  # Emil Velikov <emil.l
 
 prepare() {
   cd mesa-$pkgver
-  patch --forward --strip=1 --input="${srcdir}/convert-interlaced-nv12-to-progressive.patch"
+  patch --forward --strip=1 --input="${srcdir}/5942.patch"
 }
 
 build() {
